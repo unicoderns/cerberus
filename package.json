@@ -1,0 +1,35 @@
+{
+  "name": "@unicoderns/cerberus",
+  "version": "0.0.1",
+  "description": "Auth secure library",
+  "author": {
+    "name": "Unicoderns S.A.",
+    "email": "info@unicoderns.com",
+    "url": "https://unicoderns.com/"
+  },
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc",
+    "test": "ts-node node_modules/jasmine/bin/jasmine sources/tests/**/*.test.ts"
+  },
+  "bugs": {
+    "url": "https://github.com/unicoderns/cerberus/issues",
+    "email": "info@unicoderns.com"
+  },
+  "keywords": [
+    "auth",
+    "secure",
+    "Restful",
+    "jwt",
+    "nodejs",
+    "typescript"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@unicoderns/orm": "^0.1.7",
+    "typescript": "^3.1.3"
+  },
+  "devDependencies": {}
+}
