@@ -23,6 +23,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 
+import * as bcrypt from "bcrypt";
 import * as users from "../models/db/usersModel";
 import * as sessions from "../models/db/sessionsModel";
 import * as verifications from "../models/db/verificationsModel";
@@ -33,8 +34,6 @@ import { Reply } from "../interfaces/general";
 import Vault from "../vault"
 
 let ip = require("ip");
-let bcrypt = require("bcrypt-nodejs");
-// import * as bcrypt from "bcrypt-nodejs"; <- Doesn't work
 
 /**
  * Index Endpoint

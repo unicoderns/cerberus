@@ -196,6 +196,124 @@ class Sessions {
             return p;
         };
         /**
+         * Force an update context user
+         *
+         * @param req {Request} The request object.
+         * @param res {Response} The response object.
+         * @param next Callback.
+         */
+        this.getUpdated = (token) => {
+            let config = this.config;
+            let vault = this.vault;
+            const p = new Promise((resolve, reject) => {
+                // Verifies secret and checks exp
+                jwt.verify(token, config.token, function (err, decoded) {
+                    if (err) {
+                        reject({
+                            success: false,
+                            message: "Token invalid!",
+                            error: err
+                        });
+                    }
+                    else {
+                        vault.getUser(decoded.user, false).then((user) => {
+                            resolve({
+                                success: true,
+                                message: "User vault updated.",
+                                user: user
+                            });
+                        }).catch((err) => {
+                            reject({
+                                success: false,
+                                message: "Vault error.",
+                                error: err
+                            });
+                        });
+                    }
+                });
+            });
+            return p;
+        };
+        /**
+         * Get context user
+         *
+         * @param req {Request} The request object.
+         * @param res {Response} The response object.
+         * @param next Callback.
+         */
+        this.get = (token) => {
+            let vault = this.vault;
+            let config = this.config;
+            let sessionsTable = this.sessionsTable;
+            const p = new Promise((resolve, reject) => {
+                if (token) {
+                    // Decode token
+                    jwt.verify(token, config.token, function (err, decoded) {
+                        if (err) {
+                            reject({
+                                success: false,
+                                message: "Token invalid!",
+                                error: err
+                            });
+                        }
+                        else {
+                            if (config.settings.session == "stateful") {
+                                sessionsTable.get({
+                                    where: {
+                                        id: decoded.session,
+                                        user: decoded.user
+                                    }
+                                }).then((session) => {
+                                    if (typeof session === "undefined") {
+                                        reject({
+                                            success: false,
+                                            message: "No session available."
+                                        });
+                                    }
+                                    else {
+                                        vault.getUser(decoded.user).then((user) => {
+                                            resolve({
+                                                success: true,
+                                                message: "User from vault.",
+                                                user: user
+                                            });
+                                        }).catch(err => {
+                                            reject({
+                                                success: false,
+                                                message: "Vault error.",
+                                                error: err
+                                            });
+                                        });
+                                    }
+                                }).catch(err => {
+                                    reject({
+                                        success: false,
+                                        message: "Something went wrong.",
+                                        error: err
+                                    });
+                                });
+                            }
+                            else {
+                                // If everything is good, save to request for use in other routes
+                                resolve({
+                                    success: true,
+                                    message: "Stateless user.",
+                                    user: decoded
+                                });
+                            }
+                        }
+                    });
+                }
+                else {
+                    reject({
+                        success: false,
+                        message: "No token provided.",
+                    });
+                }
+            });
+            return p;
+        };
+        /**
          * Get all sessions.
          *
          * @param req { Request } The request object.
@@ -212,7 +330,6 @@ class Sessions {
                     }]).getAll({}).then((data) => {
                     resolve(data);
                 }).catch(err => {
-                    console.error(err);
                     reject({
                         success: false,
                         message: "Something went wrong.",

@@ -30,12 +30,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const bcrypt = __importStar(require("bcrypt"));
 const users = __importStar(require("../models/db/usersModel"));
 const sessions = __importStar(require("../models/db/sessionsModel"));
 const verifications = __importStar(require("../models/db/verificationsModel"));
 let ip = require("ip");
-let bcrypt = require("bcrypt-nodejs");
-// import * as bcrypt from "bcrypt-nodejs"; <- Doesn't work
 /**
  * Index Endpoint
  *

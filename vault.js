@@ -90,6 +90,7 @@ class Vault {
             delete this.userCache[id];
         };
         this.DB = DB;
+        this.userCache = {};
     }
 }
 exports.default = Vault;

@@ -3,6 +3,7 @@
 export interface Reply {
     success: boolean;
     message: string;
+    user?: any;
     token?: string;
     error?: NodeJS.ErrnoException;
 }

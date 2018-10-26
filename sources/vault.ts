@@ -41,6 +41,7 @@ export default class Vault {
      */
     constructor(DB: DB) {
         this.DB = DB;
+        this.userCache = {};
     }
 
 
@@ -74,6 +75,7 @@ export default class Vault {
 
         if (cached) {
             let userTemp = userCache[id];
+
             if (typeof userTemp === "undefined") {
                 return fromSQL();
             } else {

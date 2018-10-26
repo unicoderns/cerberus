@@ -224,13 +224,15 @@ export default class Sessions {
      * @param res {Response} The response object.
      * @param next Callback.
      */
-    public getUpdated = (token: string, secretOrPublicKey: string): Promise<Reply> => {
+    public getUpdated = (token: string): Promise<Reply> => {
+        let config = this.config;
         let vault = this.vault;
+
         const p: Promise<Reply> = new Promise(
             (resolve: (reply: Reply) => void, reject: (reply: Reply) => void) => {
                 // Verifies secret and checks exp
-                jwt.verify(token, secretOrPublicKey, function (err: NodeJS.ErrnoException, decoded: any) {
-                    if (typeof err !== "undefined") {
+                jwt.verify(token, config.token, function (err: NodeJS.ErrnoException, decoded: any) {
+                    if (err) {
                         reject({
                             success: false,
                             message: "Token invalid!",
@@ -263,68 +265,73 @@ export default class Sessions {
      * @param res {Response} The response object.
      * @param next Callback.
      */
-    public get = (token: string, secretOrPublicKey: string): Promise<Reply> => {
+    public get = (token: string): Promise<Reply> => {
         let vault = this.vault;
         let config = this.config;
         let sessionsTable = this.sessionsTable;
 
         const p: Promise<Reply> = new Promise(
             (resolve: (reply: Reply) => void, reject: (reply: Reply) => void) => {
-                //        let authConfig = this.config.system_apps.find((x: any) => x.name == 'auth');
-                //        let userCacheFactory = this.jsloth.cerberus.vault.getUser;
-                // Decode token
-                jwt.verify(token, secretOrPublicKey, function (err: NodeJS.ErrnoException, decoded: any) {
-                    if (typeof err !== "undefined") {
-                        reject({
-                            success: false,
-                            message: "Token invalid!",
-                            error: err
-                        })
-                    } else {
-                        if (config.settings.session == "stateful") {
-                            sessionsTable.get({
-                                where: {
-                                    id: decoded.session,
-                                    user: decoded.user
-                                }
-                            }).then((session: any) => {
-                                if (typeof session === "undefined") {
-                                    reject({
-                                        success: false,
-                                        message: "No session available."
-                                    })
-                                } else {
-                                    vault.getUser(decoded.user).then((user: any) => {
-                                        resolve({
-                                            success: true,
-                                            message: "User from vault.",
-                                            user: user
-                                        });
-                                    }).catch(err => {
+                if (token) {
+                    // Decode token
+                    jwt.verify(token, config.token, function (err: NodeJS.ErrnoException, decoded: any) {
+                        if (err) {
+                            reject({
+                                success: false,
+                                message: "Token invalid!",
+                                error: err
+                            })
+                        } else {
+                            if (config.settings.session == "stateful") {
+                                sessionsTable.get({
+                                    where: {
+                                        id: decoded.session,
+                                        user: decoded.user
+                                    }
+                                }).then((session: any) => {
+                                    if (typeof session === "undefined") {
                                         reject({
                                             success: false,
-                                            message: "Vault error.",
-                                            error: err
+                                            message: "No session available."
                                         })
-                                    });
-                                }
-                            }).catch(err => {
-                                reject({
-                                    success: false,
-                                    message: "Something went wrong.",
-                                    error: err
-                                })
-                            });
-                        } else {
-                            // If everything is good, save to request for use in other routes
-                            resolve({
-                                success: true,
-                                message: "Stateless user.",
-                                user: decoded
-                            });
+                                    } else {
+                                        vault.getUser(decoded.user).then((user: any) => {
+                                            resolve({
+                                                success: true,
+                                                message: "User from vault.",
+                                                user: user
+                                            });
+                                        }).catch(err => {
+                                            reject({
+                                                success: false,
+                                                message: "Vault error.",
+                                                error: err
+                                            })
+                                        });
+                                    }
+                                }).catch(err => {
+                                    reject({
+                                        success: false,
+                                        message: "Something went wrong.",
+                                        error: err
+                                    })
+                                });
+                            } else {
+                                // If everything is good, save to request for use in other routes
+                                resolve({
+                                    success: true,
+                                    message: "Stateless user.",
+                                    user: decoded
+                                });
+                            }
                         }
-                    }
-                });
+                    });
+                } else {
+                    reject({
+                        success: false,
+                        message: "No token provided.",
+                    })
+                }
             });
         return p;
     }
