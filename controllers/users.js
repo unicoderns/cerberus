@@ -68,9 +68,11 @@ class Users {
                             bcrypt.hash(newUser.password, 12).then(function (hash) {
                                 newUser.password = hash;
                                 usersTable.insert(newUser).then((data) => {
+                                    newUser.id = data.insertId;
                                     resolve({
                                         success: true,
-                                        message: "User created!"
+                                        message: "User created!",
+                                        user: newUser
                                     });
                                 }).catch(err => {
                                     reject({
