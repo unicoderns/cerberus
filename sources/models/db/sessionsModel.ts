@@ -25,8 +25,6 @@
 import * as usersModel from "./usersModel";
 import { field, secret, Fields, Defaults, Datatypes, Models, Model } from "@unicoderns/orm"
 
-import * as timezones from "../static/timezoneModel";
-
 export interface Row extends Models.Row {
     id?: number;
     created?: number;
