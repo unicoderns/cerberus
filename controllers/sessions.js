@@ -56,7 +56,7 @@ class Sessions {
         this.sign = (data) => {
             let config = this.config;
             let token = jwt.sign(data, config.token, {
-                expiresIn: config.settings.expiration // 5 years
+                expiresIn: config.settings.expiration
             });
             return {
                 success: true,
@@ -152,6 +152,7 @@ class Sessions {
          * @return json
          */
         this.renew = (user) => {
+            // query for user here.?
             // Clean data
             delete user.iat;
             delete user.exp;
@@ -192,45 +193,6 @@ class Sessions {
                         message: "This kind of sessions can't be revoked!",
                     });
                 }
-            });
-            return p;
-        };
-        /**
-         * Force an update context user
-         *
-         * @param req {Request} The request object.
-         * @param res {Response} The response object.
-         * @param next Callback.
-         */
-        this.getUpdated = (token) => {
-            let config = this.config;
-            let vault = this.vault;
-            const p = new Promise((resolve, reject) => {
-                // Verifies secret and checks exp
-                jwt.verify(token, config.token, function (err, decoded) {
-                    if (err) {
-                        reject({
-                            success: false,
-                            message: "Token invalid!",
-                            error: err
-                        });
-                    }
-                    else {
-                        vault.getUser(decoded.user, false).then((user) => {
-                            resolve({
-                                success: true,
-                                message: "User vault updated.",
-                                user: user
-                            });
-                        }).catch((err) => {
-                            reject({
-                                success: false,
-                                message: "Vault error.",
-                                error: err
-                            });
-                        });
-                    }
-                });
             });
             return p;
         };
@@ -310,6 +272,45 @@ class Sessions {
                         message: "No token provided.",
                     });
                 }
+            });
+            return p;
+        };
+        /**
+         * Force an update context user
+         *
+         * @param req {Request} The request object.
+         * @param res {Response} The response object.
+         * @param next Callback.
+         */
+        this.getUpdated = (token) => {
+            let config = this.config;
+            let vault = this.vault;
+            const p = new Promise((resolve, reject) => {
+                // Verifies secret and checks exp
+                jwt.verify(token, config.token, function (err, decoded) {
+                    if (err) {
+                        reject({
+                            success: false,
+                            message: "Token invalid!",
+                            error: err
+                        });
+                    }
+                    else {
+                        vault.getUser(decoded.user, false).then((user) => {
+                            resolve({
+                                success: true,
+                                message: "User vault updated.",
+                                user: user
+                            });
+                        }).catch((err) => {
+                            reject({
+                                success: false,
+                                message: "Vault error.",
+                                error: err
+                            });
+                        });
+                    }
+                });
             });
             return p;
         };

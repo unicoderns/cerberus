@@ -50,14 +50,6 @@ export default class Sessions {
     */
     revoke: (user: number) => Promise<Reply>;
     /**
-     * Force an update context user
-     *
-     * @param req {Request} The request object.
-     * @param res {Response} The response object.
-     * @param next Callback.
-     */
-    getUpdated: (token: string) => Promise<Reply>;
-    /**
      * Get context user
      *
      * @param req {Request} The request object.
@@ -65,6 +57,14 @@ export default class Sessions {
      * @param next Callback.
      */
     get: (token: string) => Promise<Reply>;
+    /**
+     * Force an update context user
+     *
+     * @param req {Request} The request object.
+     * @param res {Response} The response object.
+     * @param next Callback.
+     */
+    getUpdated: (token: string) => Promise<Reply>;
     /**
      * Get all sessions.
      *

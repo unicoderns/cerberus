@@ -5,7 +5,7 @@ Cerberus models are powered by [unicoderns ORM](http://unicoderns.com/docs/ORM/)
 ## List
 
 * [Sessions](02-sessions.md)
-* Users
-* Verifications
+* [Users](03-users.md)
+* Verifications (Coming Soon)
 * Resources (Coming Soon)
 * Resources Permissions (Coming Soon)

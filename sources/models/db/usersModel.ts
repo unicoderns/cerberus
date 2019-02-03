@@ -26,7 +26,7 @@ import { field, secret, Fields, Defaults, Datatypes, Models, Model } from "@unic
 
 import * as timezones from "../static/timezoneModel";
 
-export interface Row {
+export interface Row extends Models.Row {
     id?: number;
     created?: number;
     username: string;
