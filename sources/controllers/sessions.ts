@@ -28,19 +28,17 @@ import * as users from "../models/db/usersModel";
 import * as sessions from "../models/db/sessionsModel";
 
 import { Config } from "../interfaces/config";
-import { Reply, Login } from "../interfaces/general";
+import { Response, Login } from "../interfaces/general";
 
 import { Models } from "@unicoderns/orm"
 
+import Responses from "../responses/responses";
 import Vault from "../vault"
 
 let ip = require("ip");
 
 /**
- * Index Endpoint
- * 
- * @basepath /
- * @return express.Router
+ * Sessions Operations
  */
 export default class Sessions {
     protected config: Config;
@@ -59,25 +57,18 @@ export default class Sessions {
     }
 
     /**
-     * Sign JWT token and reply.
+     * Sign JWT token and response.
      *
-     * @param req { Request } The request object.
-     * @param res { Response } The response object.
-     * @param config { Object } The config object.
-     * @param data { Object } Data to sign and create token.
-     * @return json
+     * @param data Session and user ids.
+     * @return Response
      */
-    private sign = (data: any): Reply => {
-        let config = this.config;
-        let token = jwt.sign(data, config.token, {
+    private sign = (data: { session: number, user: number }): Response => {
+        const config = this.config;
+        const token = jwt.sign(data, config.token, {
             expiresIn: config.settings.expiration
-        });
+        })
 
-        return {
-            success: true,
-            message: "Enjoy your token!",
-            token: token
-        };
+        return Responses.TokenCreated(token);
     }
 
     /**
@@ -87,7 +78,7 @@ export default class Sessions {
      * @param res { Response } The response object.
      * @return json
      */
-    public create = (login: Login): Promise<Reply> => {
+    public create = (login: Login): Promise<Response> => {
         let email = login.email;
         let password = login.password;
 
@@ -99,30 +90,21 @@ export default class Sessions {
         let sign = this.sign;
 
         // Create promise
-        const p: Promise<Reply> = new Promise(
-            (resolve: (reply: Reply) => void, reject: (reply: Reply) => void) => {
+        const p: Promise<Response> = new Promise(
+            (resolve: (reply: Response) => void, reject: (reply: Response) => void) => {
                 if (!this.emailRegex.test(email)) {
-                    reject({
-                        success: false,
-                        message: "Invalid email address."
-                    });
+                    reject(Responses.InvalidEmail);
                 } else {
-                    // find the user
                     unsafeUsersTable.get({
                         where: { email: email, active: 1 }
                     }).then((user) => {
                         if (typeof user === "undefined") {
-                            reject({
-                                success: false,
-                                message: "Authentication failed. User and password don't match."
-                            });
+                            reject(Responses.WrongUserAndPassword);
                         } else {
                             bcrypt.compare(password, user.password).then(function (match) {
                                 if (match) {
-                                    // if user is found and password is right
-                                    // create a token
                                     if (config.settings.session == "stateful") {
-                                        let temp: sessions.Row = {
+                                        const temp: sessions.Row = {
                                             ip: ip.address(),
                                             user: user.id
                                         };
@@ -132,29 +114,18 @@ export default class Sessions {
                                                 user: user.id
                                             }));
                                         }).catch(err => {
-                                            reject({
-                                                success: false,
-                                                message: "Session could't get created.",
-                                                error: err
-                                            });
+                                            reject(Responses.SessionCreationProblem);
                                         });
                                     } else {
                                         resolve(sign(JSON.parse(JSON.stringify(user))));
                                     }
                                 } else {
-                                    reject({
-                                        success: false,
-                                        message: "Authentication failed. User and password don't match."
-                                    });
+                                    reject(Responses.WrongUserAndPassword);
                                 }
                             });
                         }
                     }).catch(err => {
-                        reject({
-                            success: false,
-                            message: "Something went wrong.",
-                            error: err
-                        });
+                        reject(Responses.DBSelectError(err));
                     });
                 };
             });
@@ -168,9 +139,8 @@ export default class Sessions {
      * @param res { Response } The response object.
      * @return json
      */
-    public renew = (user: any): Reply => {
-        // query for user here.?
-        // Clean data
+    public renew = (user: any): Response => {
+        // Clean old data
         delete user.iat;
         delete user.exp;
 
@@ -184,34 +154,23 @@ export default class Sessions {
     * @param res { Response } The response object.
     * @return json
     */
-    public revoke = (user: number): Promise<Reply> => {
+    public revoke = (user: number): Promise<Response> => {
         let vault = this.vault;
         let config = this.config;
 
         // Create promise
-        const p: Promise<Reply> = new Promise(
-            (resolve: (reply: Reply) => void, reject: (reply: Reply) => void) => {
+        const p: Promise<Response> = new Promise(
+            (resolve: (reply: Response) => void, reject: (reply: Response) => void) => {
                 if (config.settings.session == "stateful") {
                     this.sessionsTable.delete({ user: user }).then((done) => {
                         // Remove cached user
                         vault.removeUser(user);
-                        resolve({
-                            success: true,
-                            message: "Session revoked!"
-                        });
+                        resolve(Responses.SessionRevoked);
                     }).catch(err => {
-                        console.error(err);
-                        reject({
-                            success: false,
-                            message: "Something went wrong.",
-                            error: err
-                        });
+                        reject(Responses.DBDeleteError(err));
                     });
                 } else {
-                    reject({
-                        success: false,
-                        message: "This kind of sessions can't be revoked!",
-                    });
+                    reject(Responses.StatelessRevokeError);
                 }
             });
         return p;
@@ -224,22 +183,18 @@ export default class Sessions {
      * @param res {Response} The response object.
      * @param next Callback.
      */
-    public get = (token: string): Promise<Reply> => {
+    public get = (token: string): Promise<Response> => {
         let vault = this.vault;
         let config = this.config;
         let sessionsTable = this.sessionsTable;
 
-        const p: Promise<Reply> = new Promise(
-            (resolve: (reply: Reply) => void, reject: (reply: Reply) => void) => {
+        const p: Promise<Response> = new Promise(
+            (resolve: (reply: Response) => void, reject: (reply: Response) => void) => {
                 if (token) {
                     // Decode token
                     jwt.verify(token, config.token, function (err: NodeJS.ErrnoException, decoded: any) {
                         if (err) {
-                            reject({
-                                success: false,
-                                message: "Token invalid!",
-                                error: err
-                            })
+                            reject(Responses.InvalidToken(err))
                         } else {
                             if (config.settings.session == "stateful") {
                                 sessionsTable.get({
@@ -249,47 +204,24 @@ export default class Sessions {
                                     }
                                 }).then((session: any) => {
                                     if (typeof session === "undefined") {
-                                        reject({
-                                            success: false,
-                                            message: "No session available."
-                                        })
+                                        reject(Responses.SessionNotFound)
                                     } else {
                                         vault.getUser(decoded.user).then((user: any) => {
-                                            resolve({
-                                                success: true,
-                                                message: "User from vault.",
-                                                user: user
-                                            });
+                                            resolve(Responses.GetUser(user));
                                         }).catch(err => {
-                                            reject({
-                                                success: false,
-                                                message: "Vault error.",
-                                                error: err
-                                            })
+                                            Responses.VaultError(err)
                                         });
                                     }
                                 }).catch(err => {
-                                    reject({
-                                        success: false,
-                                        message: "Something went wrong.",
-                                        error: err
-                                    })
+                                    reject(Responses.DBSelectError(err))
                                 });
                             } else {
-                                // If everything is good, save to request for use in other routes
-                                resolve({
-                                    success: true,
-                                    message: "Stateless user.",
-                                    user: decoded
-                                });
+                                resolve(Responses.GetUser(decoded));
                             }
                         }
                     });
                 } else {
-                    reject({
-                        success: false,
-                        message: "No token provided.",
-                    })
+                    reject(Responses.NoToken)
                 }
             });
         return p;
@@ -302,33 +234,21 @@ export default class Sessions {
      * @param res {Response} The response object.
      * @param next Callback.
      */
-    public getUpdated = (token: string): Promise<Reply> => {
+    public getUpdated = (token: string): Promise<Response> => {
         let config = this.config;
         let vault = this.vault;
 
-        const p: Promise<Reply> = new Promise(
-            (resolve: (reply: Reply) => void, reject: (reply: Reply) => void) => {
+        const p: Promise<Response> = new Promise(
+            (resolve: (reply: Response) => void, reject: (reply: Response) => void) => {
                 // Verifies secret and checks exp
                 jwt.verify(token, config.token, function (err: NodeJS.ErrnoException, decoded: any) {
                     if (err) {
-                        reject({
-                            success: false,
-                            message: "Token invalid!",
-                            error: err
-                        });
+                        reject(Responses.InvalidToken(err));
                     } else {
                         vault.getUser(decoded.user, false).then((user: any) => {
-                            resolve({
-                                success: true,
-                                message: "User vault updated.",
-                                user: user
-                            });
+                            resolve(Responses.UserUpdated);
                         }).catch((err: NodeJS.ErrnoException) => {
-                            reject({
-                                success: false,
-                                message: "Vault error.",
-                                error: err
-                            });
+                            Responses.VaultError(err)
                         });
                     }
                 });
@@ -346,7 +266,7 @@ export default class Sessions {
     public listAll = (): Promise<any> => {
         // Create promise
         const p: Promise<any> = new Promise(
-            (resolve: (data: any) => void, reject: (reply: Reply) => void) => {
+            (resolve: (data: any) => void, reject: (reply: Response) => void) => {
                 this.sessionsTable.join([{
                     keyField: this.sessionsTable.user,
                     fields: ["username", "email", "firstName", "lastName"],
@@ -354,11 +274,7 @@ export default class Sessions {
                 }]).getAll({}).then((data) => {
                     resolve(data);
                 }).catch(err => {
-                    reject({
-                        success: false,
-                        message: "Something went wrong.",
-                        error: err
-                    });
+                    reject(Responses.DBSelectError(err));
                 });
             });
         return p;
@@ -374,7 +290,7 @@ export default class Sessions {
     public listSome = (where: string | Models.KeyValue | Models.KeyValue[]): Promise<any> => {
         // Create promise
         const p: Promise<any> = new Promise(
-            (resolve: (data: any) => void, reject: (reply: Reply) => void) => {
+            (resolve: (data: any) => void, reject: (reply: Response) => void) => {
                 this.sessionsTable.join([{
                     keyField: this.sessionsTable.user,
                     fields: ["username", "email", "firstName", "lastName"],
@@ -382,12 +298,7 @@ export default class Sessions {
                 }]).getSome({ where: where }).then((data) => {
                     resolve(data);
                 }).catch(err => {
-                    console.error(err);
-                    reject({
-                        success: false,
-                        message: "Something went wrong.",
-                        error: err
-                    });
+                    reject(Responses.DBSelectError(err));
                 });
             });
         return p;

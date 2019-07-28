@@ -25,12 +25,11 @@
 
 import * as bcrypt from "bcrypt";
 import * as users from "../models/db/usersModel";
-import * as sessions from "../models/db/sessionsModel";
-import * as verifications from "../models/db/verificationsModel";
 
 import { Config } from "../interfaces/config";
-import { Reply } from "../interfaces/general";
+import { Response } from "../interfaces/general";
 
+import Responses from "../responses/responses";
 import Vault from "../vault"
 
 let ip = require("ip");
@@ -42,20 +41,20 @@ let ip = require("ip");
  * @return express.Router
  */
 export default class Users {
-    protected config: Config;
-    protected vault: Vault;
+    protected readonly config: Config;
+    protected readonly vault: Vault;
 
-    private usersTable: users.Users;
-    private sessionsTable: sessions.Sessions;
-    private verificationsTable: verifications.Verifications;
-    private emailRegex = /^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+    private readonly usersTable: users.Users;
+    private readonly unsafeUserTable: users.Users;
+
+    private readonly emailRegex = /^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+    private readonly hashRounds: number = 12;
 
     constructor(config: Config, vault: Vault) {
         this.config = config;
         this.vault = vault;
         this.usersTable = new users.Users(config.DB);
-        this.sessionsTable = new sessions.Sessions(config.DB);
-        this.verificationsTable = new verifications.Verifications(config.DB);
+        this.unsafeUserTable = new users.Users(config.DB, "unsafe");
     }
 
     /**
@@ -65,54 +64,80 @@ export default class Users {
      * @param res { Response } The response object.
      * @return bool
      */
-    public signup = (newUser: any): Promise<Reply> => {
+    public signup = (newUser: any): Promise<Response> => {
         let usersTable = this.usersTable;
-        // Create promise
-        const p: Promise<Reply> = new Promise(
-            (resolve: (reply: Reply) => void, reject: (reply: Reply) => void) => {
+        const p: Promise<Response> = new Promise(
+            (resolve: (reply: Response) => void, reject: (reply: Response) => void) => {
 
                 this.usersTable.get({
                     where: [{ username: newUser.username }, { email: newUser.email }]
                 }).then((user) => {
                     if (typeof user === "undefined") {
                         if (!this.emailRegex.test(newUser.email)) {
-                            reject({
-                                success: false, message: "Invalid email address."
-                            });
+                            reject(Responses.InvalidEmail);
                         } else {
-                            bcrypt.hash(newUser.password, 12).then(function (hash: string) {
+                            bcrypt.hash(newUser.password, this.hashRounds).then(function (hash: string) {
                                 newUser.password = hash;
                                 usersTable.insert(newUser).then((data: any) => {
                                     newUser.id = data.insertId;
-                                    resolve({
-                                        success: true,
-                                        message: "User created!",
-                                        user: newUser
-                                    });
+                                    resolve(Responses.UserCreated);
                                 }).catch(err => {
-                                    reject({
-                                        success: false,
-                                        message: "Something went wrong.",
-                                        error: err
-                                    });
+                                    reject(Responses.DBInsertError(err));
                                 });
                             });
                         }
                     } else {
-                        reject({
-                            success: false,
-                            message: "Username or email already exists."
-                        });
+                        reject(Responses.UsernameOrEmailExists);
                     }
                 }).catch(err => {
-                    reject({
-                        success: false,
-                        message: "Something went wrong.",
-                        error: err
-                    });
+                    reject(Responses.DBSelectError(err));
                 });
             });
         return p;
     }
+
+    /**
+     * Update user password.
+     *
+     * @param user { number } User Id.
+     * @param oldPassword { string } Existing user password.
+     * @param newPassword { string } New password.
+     * @param verificationPassword { string } New password verification.
+     * @return bool
+     */
+    public updatePassword = (user: number, oldPassword: string, newPassword: string, verificationPassword: string): Promise<Response> => {
+        const hashRounds = this.hashRounds;
+        let usersTable = this.usersTable;
+
+        const p: Promise<Response> = new Promise(
+            (resolve: (reply: Response) => void, reject: (reply: Response) => void) => {
+
+                if ((newPassword.length >= 6) && (newPassword === verificationPassword)) {
+                    this.unsafeUserTable.get({
+                        where: { id: user }
+                    }).then((dbUser: any) => {
+                        bcrypt.compare(oldPassword, dbUser.password).then(function (match) {
+                            if (match) {
+                                usersTable.update({
+                                    data: { password: bcrypt.hashSync(dbUser.password, hashRounds) },
+                                    where: { id: user }
+                                }).then((data) => {
+                                    resolve(Responses.UserUpdated);
+                                }).catch(err => {
+                                    reject(Responses.DBUpdateError(err));
+                                });
+                            } else {
+                                reject(Responses.WrongUserAndPassword);
+                            }
+                        });
+                    }).catch(err => {
+                        reject(Responses.DBSelectError(err));
+                    });
+                } else {
+                    reject(Responses.UnacceptablePassword);
+                }
+            });
+        return p;
+    };
 
 }

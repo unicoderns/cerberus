@@ -32,7 +32,6 @@ export interface Row extends Models.Row {
     username: string;
     email: string;
     password: string;
-    salt: string;
     firstName?: string;
     lastName?: string;
     timezone?: number;
@@ -72,12 +71,6 @@ export class Users extends Model {
     public password = new Datatypes().CHAR({
         notNull: true,
         size: 60
-    });
-
-    @secret()
-    public salt = new Datatypes().VARCHAR({
-        notNull: true,
-        size: 20
     });
 
     @field()
