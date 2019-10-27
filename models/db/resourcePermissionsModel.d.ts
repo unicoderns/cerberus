@@ -1,5 +1,5 @@
-import { Fields, Model } from "@unicoderns/orm";
-export interface Row {
+import { Fields, Models, Model } from "@unicoderns/orm";
+export interface Row extends Models.Row {
     id?: number;
     created?: number;
     resource: number;

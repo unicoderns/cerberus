@@ -1,12 +1,9 @@
 import { Config } from "../interfaces/config";
-import { Reply, Login } from "../interfaces/general";
+import { Response, Login } from "../interfaces/general";
 import { Models } from "@unicoderns/orm";
 import Vault from "../vault";
 /**
- * Index Endpoint
- *
- * @basepath /
- * @return express.Router
+ * Sessions Operations
  */
 export default class Sessions {
     protected config: Config;
@@ -16,13 +13,10 @@ export default class Sessions {
     private emailRegex;
     constructor(config: Config, vault: Vault);
     /**
-     * Sign JWT token and reply.
+     * Sign JWT token and response.
      *
-     * @param req { Request } The request object.
-     * @param res { Response } The response object.
-     * @param config { Object } The config object.
-     * @param data { Object } Data to sign and create token.
-     * @return json
+     * @param data Session and user ids.
+     * @return Response
      */
     private sign;
     /**
@@ -32,7 +26,7 @@ export default class Sessions {
      * @param res { Response } The response object.
      * @return json
      */
-    create: (login: Login) => Promise<Reply>;
+    create: (login: Login) => Promise<Response>;
     /**
      * Get new auth token.
      *
@@ -40,7 +34,7 @@ export default class Sessions {
      * @param res { Response } The response object.
      * @return json
      */
-    renew: (user: any) => Reply;
+    renew: (user: any) => Response;
     /**
     * Revoke a token for a stateful session.
     *
@@ -48,7 +42,7 @@ export default class Sessions {
     * @param res { Response } The response object.
     * @return json
     */
-    revoke: (user: number) => Promise<Reply>;
+    revoke: (user: number) => Promise<Response>;
     /**
      * Get context user
      *
@@ -56,7 +50,7 @@ export default class Sessions {
      * @param res {Response} The response object.
      * @param next Callback.
      */
-    get: (token: string) => Promise<Reply>;
+    get: (token: string) => Promise<Response>;
     /**
      * Force an update context user
      *
@@ -64,7 +58,7 @@ export default class Sessions {
      * @param res {Response} The response object.
      * @param next Callback.
      */
-    getUpdated: (token: string) => Promise<Reply>;
+    getUpdated: (token: string) => Promise<Response>;
     /**
      * Get all sessions.
      *

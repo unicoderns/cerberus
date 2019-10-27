@@ -29,11 +29,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const bcrypt = __importStar(require("bcrypt"));
+const bcrypt = __importStar(require("bcryptjs"));
 const users = __importStar(require("../models/db/usersModel"));
-const sessions = __importStar(require("../models/db/sessionsModel"));
-const verifications = __importStar(require("../models/db/verificationsModel"));
+const responses_1 = __importDefault(require("../responses/responses"));
 let ip = require("ip");
 /**
  * Index Endpoint
@@ -44,6 +46,7 @@ let ip = require("ip");
 class Users {
     constructor(config, vault) {
         this.emailRegex = /^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+        this.hashRounds = 12;
         /**
          * Create a user.
          *
@@ -53,58 +56,81 @@ class Users {
          */
         this.signup = (newUser) => {
             let usersTable = this.usersTable;
-            // Create promise
             const p = new Promise((resolve, reject) => {
                 this.usersTable.get({
                     where: [{ username: newUser.username }, { email: newUser.email }]
                 }).then((user) => {
                     if (typeof user === "undefined") {
                         if (!this.emailRegex.test(newUser.email)) {
-                            reject({
-                                success: false, message: "Invalid email address."
-                            });
+                            reject(responses_1.default.InvalidEmail);
                         }
                         else {
-                            bcrypt.hash(newUser.password, 12).then(function (hash) {
+                            bcrypt.hash(newUser.password, this.hashRounds).then(function (hash) {
                                 newUser.password = hash;
                                 usersTable.insert(newUser).then((data) => {
                                     newUser.id = data.insertId;
-                                    resolve({
-                                        success: true,
-                                        message: "User created!",
-                                        user: newUser
-                                    });
+                                    resolve(responses_1.default.UserCreated);
                                 }).catch(err => {
-                                    reject({
-                                        success: false,
-                                        message: "Something went wrong.",
-                                        error: err
-                                    });
+                                    reject(responses_1.default.DBInsertError(err));
                                 });
                             });
                         }
                     }
                     else {
-                        reject({
-                            success: false,
-                            message: "Username or email already exists."
-                        });
+                        reject(responses_1.default.UsernameOrEmailExists);
                     }
                 }).catch(err => {
-                    reject({
-                        success: false,
-                        message: "Something went wrong.",
-                        error: err
-                    });
+                    reject(responses_1.default.DBSelectError(err));
                 });
+            });
+            return p;
+        };
+        /**
+         * Update user password.
+         *
+         * @param user { number } User Id.
+         * @param oldPassword { string } Existing user password.
+         * @param newPassword { string } New password.
+         * @param verificationPassword { string } New password verification.
+         * @return bool
+         */
+        this.updatePassword = (user, oldPassword, newPassword, verificationPassword) => {
+            const hashRounds = this.hashRounds;
+            let usersTable = this.usersTable;
+            const p = new Promise((resolve, reject) => {
+                if ((newPassword.length >= 6) && (newPassword === verificationPassword)) {
+                    this.unsafeUserTable.get({
+                        where: { id: user }
+                    }).then((dbUser) => {
+                        bcrypt.compare(oldPassword, dbUser.password).then(function (match) {
+                            if (match) {
+                                usersTable.update({
+                                    data: { password: bcrypt.hashSync(dbUser.password, hashRounds) },
+                                    where: { id: user }
+                                }).then((data) => {
+                                    resolve(responses_1.default.UserUpdated);
+                                }).catch(err => {
+                                    reject(responses_1.default.DBUpdateError(err));
+                                });
+                            }
+                            else {
+                                reject(responses_1.default.WrongUserAndPassword);
+                            }
+                        });
+                    }).catch(err => {
+                        reject(responses_1.default.DBSelectError(err));
+                    });
+                }
+                else {
+                    reject(responses_1.default.UnacceptablePassword);
+                }
             });
             return p;
         };
         this.config = config;
         this.vault = vault;
         this.usersTable = new users.Users(config.DB);
-        this.sessionsTable = new sessions.Sessions(config.DB);
-        this.verificationsTable = new verifications.Verifications(config.DB);
+        this.unsafeUserTable = new users.Users(config.DB, "unsafe");
     }
 }
 exports.default = Users;

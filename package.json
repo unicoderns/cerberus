@@ -1,6 +1,6 @@
 {
   "name": "@unicoderns/cerberus",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Auth secure library",
   "author": {
     "name": "Unicoderns S.A.",
@@ -28,12 +28,12 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "bcrypt": "^3.0.2",
+    "bcryptjs": "^2.4.3",
     "ip": "^1.1.5",
     "jsonwebtoken": "^8.3.0"
   },
   "devDependencies": {
-    "@types/bcrypt": "^3.0.0",
+    "@types/bcryptjs": "^2.4.2",
     "@types/jasmine": "^2.8.9",
     "@types/jsonwebtoken": "^7.2.8",
     "@unicoderns/orm": "^0.1.8",

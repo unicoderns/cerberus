@@ -65,10 +65,6 @@ class Users extends orm_1.Model {
             notNull: true,
             size: 60
         });
-        this.salt = new orm_1.Datatypes().VARCHAR({
-            notNull: true,
-            size: 20
-        });
         this.firstName = new orm_1.Datatypes().VARCHAR({
             size: 45
         });
@@ -101,10 +97,6 @@ __decorate([
     orm_1.secret(),
     __metadata("design:type", Object)
 ], Users.prototype, "password", void 0);
-__decorate([
-    orm_1.secret(),
-    __metadata("design:type", Object)
-], Users.prototype, "salt", void 0);
 __decorate([
     orm_1.field(),
     __metadata("design:type", Object)

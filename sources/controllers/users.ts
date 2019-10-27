@@ -23,7 +23,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 
-import * as bcrypt from "bcrypt";
+import * as bcrypt from "bcryptjs";
 import * as users from "../models/db/usersModel";
 
 import { Config } from "../interfaces/config";

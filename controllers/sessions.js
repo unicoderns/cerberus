@@ -29,40 +29,34 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const bcrypt = __importStar(require("bcrypt"));
+const bcrypt = __importStar(require("bcryptjs"));
 const jwt = __importStar(require("jsonwebtoken"));
 const users = __importStar(require("../models/db/usersModel"));
 const sessions = __importStar(require("../models/db/sessionsModel"));
+const responses_1 = __importDefault(require("../responses/responses"));
 let ip = require("ip");
 /**
- * Index Endpoint
- *
- * @basepath /
- * @return express.Router
+ * Sessions Operations
  */
 class Sessions {
     constructor(config, vault) {
         this.emailRegex = /^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+$/;
         /**
-         * Sign JWT token and reply.
+         * Sign JWT token and response.
          *
-         * @param req { Request } The request object.
-         * @param res { Response } The response object.
-         * @param config { Object } The config object.
-         * @param data { Object } Data to sign and create token.
-         * @return json
+         * @param data Session and user ids.
+         * @return Response
          */
         this.sign = (data) => {
-            let config = this.config;
-            let token = jwt.sign(data, config.token, {
+            const config = this.config;
+            const token = jwt.sign(data, config.token, {
                 expiresIn: config.settings.expiration
             });
-            return {
-                success: true,
-                message: "Enjoy your token!",
-                token: token
-            };
+            return responses_1.default.TokenCreated(token);
         };
         /**
          * Get auth token.
@@ -81,29 +75,20 @@ class Sessions {
             // Create promise
             const p = new Promise((resolve, reject) => {
                 if (!this.emailRegex.test(email)) {
-                    reject({
-                        success: false,
-                        message: "Invalid email address."
-                    });
+                    reject(responses_1.default.InvalidEmail);
                 }
                 else {
-                    // find the user
                     unsafeUsersTable.get({
                         where: { email: email, active: 1 }
                     }).then((user) => {
                         if (typeof user === "undefined") {
-                            reject({
-                                success: false,
-                                message: "Authentication failed. User and password don't match."
-                            });
+                            reject(responses_1.default.WrongUserAndPassword);
                         }
                         else {
                             bcrypt.compare(password, user.password).then(function (match) {
                                 if (match) {
-                                    // if user is found and password is right
-                                    // create a token
                                     if (config.settings.session == "stateful") {
-                                        let temp = {
+                                        const temp = {
                                             ip: ip.address(),
                                             user: user.id
                                         };
@@ -113,11 +98,7 @@ class Sessions {
                                                 user: user.id
                                             }));
                                         }).catch(err => {
-                                            reject({
-                                                success: false,
-                                                message: "Session could't get created.",
-                                                error: err
-                                            });
+                                            reject(responses_1.default.SessionCreationProblem);
                                         });
                                     }
                                     else {
@@ -125,19 +106,12 @@ class Sessions {
                                     }
                                 }
                                 else {
-                                    reject({
-                                        success: false,
-                                        message: "Authentication failed. User and password don't match."
-                                    });
+                                    reject(responses_1.default.WrongUserAndPassword);
                                 }
                             });
                         }
                     }).catch(err => {
-                        reject({
-                            success: false,
-                            message: "Something went wrong.",
-                            error: err
-                        });
+                        reject(responses_1.default.DBSelectError(err));
                     });
                 }
                 ;
@@ -152,8 +126,7 @@ class Sessions {
          * @return json
          */
         this.renew = (user) => {
-            // query for user here.?
-            // Clean data
+            // Clean old data
             delete user.iat;
             delete user.exp;
             return this.sign(user);
@@ -174,24 +147,13 @@ class Sessions {
                     this.sessionsTable.delete({ user: user }).then((done) => {
                         // Remove cached user
                         vault.removeUser(user);
-                        resolve({
-                            success: true,
-                            message: "Session revoked!"
-                        });
+                        resolve(responses_1.default.SessionRevoked);
                     }).catch(err => {
-                        console.error(err);
-                        reject({
-                            success: false,
-                            message: "Something went wrong.",
-                            error: err
-                        });
+                        reject(responses_1.default.DBDeleteError(err));
                     });
                 }
                 else {
-                    reject({
-                        success: false,
-                        message: "This kind of sessions can't be revoked!",
-                    });
+                    reject(responses_1.default.StatelessRevokeError);
                 }
             });
             return p;
@@ -212,11 +174,7 @@ class Sessions {
                     // Decode token
                     jwt.verify(token, config.token, function (err, decoded) {
                         if (err) {
-                            reject({
-                                success: false,
-                                message: "Token invalid!",
-                                error: err
-                            });
+                            reject(responses_1.default.InvalidToken(err));
                         }
                         else {
                             if (config.settings.session == "stateful") {
@@ -227,50 +185,27 @@ class Sessions {
                                     }
                                 }).then((session) => {
                                     if (typeof session === "undefined") {
-                                        reject({
-                                            success: false,
-                                            message: "No session available."
-                                        });
+                                        reject(responses_1.default.SessionNotFound);
                                     }
                                     else {
                                         vault.getUser(decoded.user).then((user) => {
-                                            resolve({
-                                                success: true,
-                                                message: "User from vault.",
-                                                user: user
-                                            });
+                                            resolve(responses_1.default.GetUser(user));
                                         }).catch(err => {
-                                            reject({
-                                                success: false,
-                                                message: "Vault error.",
-                                                error: err
-                                            });
+                                            responses_1.default.VaultError(err);
                                         });
                                     }
                                 }).catch(err => {
-                                    reject({
-                                        success: false,
-                                        message: "Something went wrong.",
-                                        error: err
-                                    });
+                                    reject(responses_1.default.DBSelectError(err));
                                 });
                             }
                             else {
-                                // If everything is good, save to request for use in other routes
-                                resolve({
-                                    success: true,
-                                    message: "Stateless user.",
-                                    user: decoded
-                                });
+                                resolve(responses_1.default.GetUser(decoded));
                             }
                         }
                     });
                 }
                 else {
-                    reject({
-                        success: false,
-                        message: "No token provided.",
-                    });
+                    reject(responses_1.default.NoToken);
                 }
             });
             return p;
@@ -289,25 +224,13 @@ class Sessions {
                 // Verifies secret and checks exp
                 jwt.verify(token, config.token, function (err, decoded) {
                     if (err) {
-                        reject({
-                            success: false,
-                            message: "Token invalid!",
-                            error: err
-                        });
+                        reject(responses_1.default.InvalidToken(err));
                     }
                     else {
                         vault.getUser(decoded.user, false).then((user) => {
-                            resolve({
-                                success: true,
-                                message: "User vault updated.",
-                                user: user
-                            });
+                            resolve(responses_1.default.UserUpdated);
                         }).catch((err) => {
-                            reject({
-                                success: false,
-                                message: "Vault error.",
-                                error: err
-                            });
+                            responses_1.default.VaultError(err);
                         });
                     }
                 });
@@ -331,11 +254,7 @@ class Sessions {
                     }]).getAll({}).then((data) => {
                     resolve(data);
                 }).catch(err => {
-                    reject({
-                        success: false,
-                        message: "Something went wrong.",
-                        error: err
-                    });
+                    reject(responses_1.default.DBSelectError(err));
                 });
             });
             return p;
@@ -357,12 +276,7 @@ class Sessions {
                     }]).getSome({ where: where }).then((data) => {
                     resolve(data);
                 }).catch(err => {
-                    console.error(err);
-                    reject({
-                        success: false,
-                        message: "Something went wrong.",
-                        error: err
-                    });
+                    reject(responses_1.default.DBSelectError(err));
                 });
             });
             return p;

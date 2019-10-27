@@ -1,11 +1,11 @@
 /// <reference types="node" />
 /*** Main general interfaces */
-export interface Reply {
+export interface Response {
     success: boolean;
+    status: number;
     message: string;
-    user?: any;
-    token?: string;
-    error?: NodeJS.ErrnoException;
+    data?: any;
+    err?: NodeJS.ErrnoException;
 }
 export interface Login {
     email: string;
